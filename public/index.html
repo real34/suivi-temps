@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Suivi de temps</title>
+</head>
+<body>
+	<h1>Suivi du temps</h1>
+
+	<form id="api_keys">
+		<fieldset>
+			<legend>Vos clés API</legend>
+
+			<label for="redmine">Clé Redmine</label>
+			<input type="text" name="redmine" value="" required="required" />
+
+			<label for="toggl">Clé Toggl</label>
+			<input type="text" name="toggl" value="" required="required" />
+		</fieldset>
+	</form>
+
+	<div id="selector">
+		<h2>Sélectionnez un projet / une version à suivre</h2>
+
+		<label for="projet">Projet</label>
+		<select name="projet" id="projet" required="required">
+			<option value="">----</option>
+		</select>
+
+		<label for="version">Version</label>
+		<select name="version" id="version" required="required">
+			<option value="">----</option>
+		</select>
+	</div>
+
+	<div id="results">
+		COUCOU
+	</div>
+
+	<script type="text/javascript" src="app.js"></script>
+</body>
+</html>
