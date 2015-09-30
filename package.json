@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "watch": "npm run proxyfy_redmine & webpack-dev-server --progress --colors --hot --inline"
+    "watch": "npm run proxyfy_redmine & webpack-dev-server --progress --colors --hot --inline --host 0.0.0.0"
   },
   "author": "",
   "license": "ISC",
