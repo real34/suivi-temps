@@ -3,7 +3,7 @@ var node_modules = path.resolve(__dirname, 'node_modules');
 
 module.exports = {
     entry: {
-        app: ['./app.js']
+        app: ['./src/app.js']
     },
     output: {
         path: "./public",
