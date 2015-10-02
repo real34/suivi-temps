@@ -4,6 +4,8 @@ import { configuration, notEmpty, updateSelect } from './helpers';
 import * as Redmine from './redmine';
 import * as Toggl from './toggl';
 
+// http://www.wolfe.id.au/2015/08/08/development-with-webpack-and-docker/
+
 $.fn.asEventStream = Bacon.$.asEventStream;
 
 const projectSelector = $('#projet');
@@ -26,7 +28,8 @@ let issues = projectSelector.asEventStream('change')
 	})
 	.flatMapLatest((data) => Bacon.fromPromise(Redmine.APICall(data.apiKey, '/issues.json', {
 		limit: 100,
-		project_id: data.projectId
+		project_id: data.projectId,
+		status_id: '*'
 	})))
 	.map('.issues');
 
@@ -37,10 +40,11 @@ function issueItem(issue) {
 	const url = `${Redmine.URL}/issues/${issue.id}`;
 	const estimation = issue.estimated_hours || 0;
 
-	return `<li id="issue-${issue.id}">
+	return `<li id="issue-${issue.id}" style="max-width: 700px">
 		<a href="${url}" target="_blank">#${issue.id}</a>
 		- ${issue.subject}
 		<span class="estimation">(Estimé : ${estimation}h)</span>
+		<span class="effectif" style="float:right">TBD</span>
 	</li>`;
 }
 
@@ -74,9 +78,23 @@ const issuesTimes = refreshTimesForVersion
 	})
 	.combine(togglApiKey, (issues, togglApiKey) => ({ issues, togglApiKey }))
 	.flatMap(data => {
-		const params = {
-			description: `#${data.issues[0]}`
-		};
-		return Bacon.fromPromise(Toggl.reportsAPICall(data.togglApiKey, '/details', params));
-	})
-	.log('toggl');
+		return Bacon.fromArray(data.issues)
+			// .delay(100) TODO Fix me
+			.flatMap(issueId => {
+				const params = {
+					description: `#${issueId}`
+				};
+				return Bacon.fromPromise(Toggl.reportsAPICall(data.togglApiKey, '/details', params))
+					.map((toggl) => ({ total_grand: toggl.total_grand, total_billable: toggl.total_billable, id: issueId }))
+			})
+	});
+
+issuesTimes.onValue(updateIssuesTime);
+
+function updateIssuesTime(issue) {
+	$(`#issue-${issue.id} .effectif`).html(`<strong>${toHumanDuration(issue.total_billable)}</strong> / ${toHumanDuration(issue.total_grand)}`);
+}
+
+function toHumanDuration(time) {
+	return parseInt(time / 1000 / 60, 10) + 'm';
+}
