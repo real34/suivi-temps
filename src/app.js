@@ -38,7 +38,7 @@ let issuesByVersion = issues
 
 function issueItem(issue) {
 	const url = `${Redmine.URL}/issues/${issue.id}`;
-	const estimation = issue.estimated_hours || 'N/A';
+	const estimation = issue.estimated_hours || 0;
 
 	return `<tr id="issue-${issue.id}">
 		<td>
@@ -50,7 +50,8 @@ function issueItem(issue) {
 		<td>${issue.status.name}</td>
 		<td class="consommé">TBD</td>
 		<td class="facturable">TBD</td>
-		<td class="percent">TBD</td>		
+		<td class="percent">TBD</td>
+		<td class="capital">TBD</td>
 	</tr>`;
 }
 
@@ -73,6 +74,7 @@ function updateIssues(issuesByVersion) {
 						<th>Temps consommé</th>
 						<th>Temps facturable</th>
 						<th>% temps</th>
+						<th>Capital</th>
 					</thead>
 					</tbody>
 						${version.issues.map(issueItem).join("\n")}
@@ -96,8 +98,7 @@ const issuesTimes = refreshTimesForVersion
 	})
 	.combine(togglApiKey, (issues, togglApiKey) => ({ issues, togglApiKey }))
 	.flatMap(data => {
-		return Bacon.fromArray(data.issues)
-			// .delay(100) TODO Fix me
+		return Bacon.sequentially(300, data.issues)
 			.flatMap(issue => {
 				const params = {
 					description: `#${issue.id}`,
@@ -111,11 +112,13 @@ const issuesTimes = refreshTimesForVersion
 issuesTimes.onValue(updateIssuesTime);
 
 function updateIssuesTime(issue) {
+	const capital = parseInt(toMilliseconds(issue.redmine.estimated_hours || 0) - issue.total_billable);
 	let percentage = parseInt((issue.total_billable / toMilliseconds(issue.redmine.estimated_hours)) * 100);
-	percentage = isNaN(percentage) ? 0 : percentage;
+	percentage = isNaN(percentage) ? 100 : percentage;
 	$(`#issue-${issue.redmine.id} .consommé`).html(toHumanDuration(issue.total_grand));
 	$(`#issue-${issue.redmine.id} .facturable`).html(toHumanDuration(issue.total_billable));
 	$(`#issue-${issue.redmine.id} .percent`).html(percentage + '%');
+	$(`#issue-${issue.redmine.id} .capital`).html(toHumanDuration(capital));
 }
 
 function toHumanDuration(time) {

@@ -6,10 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack -p",
-    "watch": "npm run proxyfy_redmine & webpack-dev-server --progress --colors --hot --inline --host 0.0.0.0"
+    "watch": "webpack-dev-server --progress --colors --hot --inline --host 0.0.0.0"
   },
   "author": "",
-  "license": "ISC",
+  "license": "",
   "dependencies": {
     "baconjs": "^0.7.60",
     "jquery": "^2.1.4"
