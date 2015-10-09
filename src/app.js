@@ -64,6 +64,7 @@ function updateIssues(issuesByVersion) {
 			<div class="version" data-id="${versionId}">
 				<h2>${version.name}</h2>
 				<button class="get-times">Zou</button>
+				<button onClick="alert('Coming soon')">Pam</button>
 				<table>
 					<thead>
 						<th>#id</th>
@@ -115,10 +116,22 @@ function updateIssuesTime(issue) {
 	const capital = parseInt(toMilliseconds(issue.redmine.estimated_hours || 0) - issue.total_billable);
 	let percentage = parseInt((issue.total_billable / toMilliseconds(issue.redmine.estimated_hours)) * 100);
 	percentage = isNaN(percentage) ? 100 : percentage;
+	
+	const isAlert = issue.redmine.done_ratio < percentage;
+	let styles = {
+		alert: {
+			"background-color": "red",
+			"color" : "#fff",
+			"font-weight": "bold"
+		},
+		normal: { "background-color": "#dedede" }
+	};
+
 	$(`#issue-${issue.redmine.id} .consommé`).html(toHumanDuration(issue.total_grand));
 	$(`#issue-${issue.redmine.id} .facturable`).html(toHumanDuration(issue.total_billable));
 	$(`#issue-${issue.redmine.id} .percent`).html(percentage + '%');
 	$(`#issue-${issue.redmine.id} .capital`).html(toHumanDuration(capital));
+	$(`#issue-${issue.redmine.id}`).css(isAlert ? styles.alert : styles.normal);
 }
 
 function toHumanDuration(time) {
