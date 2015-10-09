@@ -38,14 +38,20 @@ let issuesByVersion = issues
 
 function issueItem(issue) {
 	const url = `${Redmine.URL}/issues/${issue.id}`;
-	const estimation = issue.estimated_hours || 0;
+	const estimation = issue.estimated_hours || 'N/A';
 
-	return `<li id="issue-${issue.id}" style="max-width: 700px">
-		<a href="${url}" target="_blank">#${issue.id}</a>
-		- ${issue.subject}
-		<span class="estimation">(Estimé : ${estimation}h)</span>
-		<span class="effectif" style="float:right">TBD</span>
-	</li>`;
+	return `<tr id="issue-${issue.id}">
+		<td>
+			<a href="${url}" target="_blank">#${issue.id}</a>
+		</td>
+		<td>${issue.subject}</td>
+		<td>${estimation}h</td>
+		<td>${issue.done_ratio}%</td>
+		<td>${issue.status.name}</td>
+		<td class="consommé">TBD</td>
+		<td class="facturable">TBD</td>
+		<td class="percent">TBD</td>		
+	</tr>`;
 }
 
 function updateIssues(issuesByVersion) {
@@ -57,9 +63,21 @@ function updateIssues(issuesByVersion) {
 			<div class="version" data-id="${versionId}">
 				<h2>${version.name}</h2>
 				<button class="get-times">Zou</button>
-				<ul>
-					${version.issues.map(issueItem).join("\n")}
-				<ul>
+				<table>
+					<thead>
+						<th>#id</th>
+						<th>Description</th>
+						<th>Estimé</th>
+						<th>% réalisé</th>
+						<th>Etat</th>
+						<th>Temps consommé</th>
+						<th>Temps facturable</th>
+						<th>% temps</th>
+					</thead>
+					</tbody>
+						${version.issues.map(issueItem).join("\n")}
+					</tbody>
+				</table>
 			</div>
 		`;
 		issuesContainer.append(html);
@@ -74,27 +92,46 @@ const refreshTimesForVersion = $('body')
 
 const issuesTimes = refreshTimesForVersion
 	.combine(issuesByVersion, (versionId, issuesByVersion) => {
-		return issuesByVersion[versionId].issues.map(issue => issue.id);
+		return issuesByVersion[versionId].issues;
 	})
 	.combine(togglApiKey, (issues, togglApiKey) => ({ issues, togglApiKey }))
 	.flatMap(data => {
 		return Bacon.fromArray(data.issues)
 			// .delay(100) TODO Fix me
-			.flatMap(issueId => {
+			.flatMap(issue => {
 				const params = {
-					description: `#${issueId}`
+					description: `#${issue.id}`,
+					since: '2015-01-01'
 				};
 				return Bacon.fromPromise(Toggl.reportsAPICall(data.togglApiKey, '/details', params))
-					.map((toggl) => ({ total_grand: toggl.total_grand, total_billable: toggl.total_billable, id: issueId }))
+					.map((toggl) => ({ total_grand: toggl.total_grand, total_billable: toggl.total_billable, redmine: issue }))
 			})
 	});
 
 issuesTimes.onValue(updateIssuesTime);
 
 function updateIssuesTime(issue) {
-	$(`#issue-${issue.id} .effectif`).html(`<strong>${toHumanDuration(issue.total_billable)}</strong> / ${toHumanDuration(issue.total_grand)}`);
+	let percentage = parseInt((issue.total_billable / toMilliseconds(issue.redmine.estimated_hours)) * 100);
+	percentage = isNaN(percentage) ? 0 : percentage;
+	$(`#issue-${issue.redmine.id} .consommé`).html(toHumanDuration(issue.total_grand));
+	$(`#issue-${issue.redmine.id} .facturable`).html(toHumanDuration(issue.total_billable));
+	$(`#issue-${issue.redmine.id} .percent`).html(percentage + '%');
 }
 
 function toHumanDuration(time) {
-	return parseInt(time / 1000 / 60, 10) + 'm';
+	let result = '';
+	let timeInMinutes = parseInt(time / 1000 / 60, 10);
+	let timeInHours = parseInt(timeInMinutes / 60, 10);
+
+	if (timeInHours) {
+		result += `${timeInHours}h`;
+	}
+
+	timeInMinutes -= timeInHours * 60;
+	result += `${timeInMinutes}m`;
+	return result;
+}
+
+function toMilliseconds(timeInHours) {
+	return timeInHours * 60 * 60 * 1000;
 }
