@@ -1,3 +1,4 @@
+import Yolk from 'yolk';
 import $ from 'jquery';
 import Bacon from 'baconjs';
 import { configuration, notEmpty, updateSelect } from './helpers';
@@ -116,7 +117,7 @@ function updateIssuesTime(issue) {
 	const capital = parseInt(toMilliseconds(issue.redmine.estimated_hours || 0) - issue.total_billable);
 	let percentage = parseInt((issue.total_billable / toMilliseconds(issue.redmine.estimated_hours)) * 100);
 	percentage = isNaN(percentage) ? 100 : percentage;
-	
+
 	const isAlert = issue.redmine.done_ratio < percentage;
 	let styles = {
 		alert: {
@@ -151,3 +152,80 @@ function toHumanDuration(time) {
 function toMilliseconds(timeInHours) {
 	return timeInHours * 60 * 60 * 1000;
 }
+
+function App() {
+	const settings = this.createEventHandler();
+	const project = this.createEventHandler();
+
+	return <div>
+		<h1>Suivi du temps</h1>
+
+		<Settings onChange={settings} />
+		<ProjectSelector redmineApiKey={settings.redmineApiKey} onChange={project} />
+
+		<TasksList project={project}/>
+	</div>
+}
+
+function Settings({onChange}) {
+	const redmineApi = {onNext: function(val) {
+		console.debug('redmine', val);
+	}};
+
+	//let redmineApiKey = configuration($('[name=redmine]'), 'redmineApiKey');
+	//let togglApiKey = configuration($('[name=toggl]'), 'togglApiKey');
+	return 	<form id="api_keys">
+		<fieldset>
+			<legend>Vos clés API</legend>
+
+			<SettingsLocalStorageInput localStorageKey="redmineApiKey" onChange={redmineApi} />
+
+			<label for="toggl">Clé Toggl</label>
+			<input type="text" name="toggl" value="" required="required" />
+		</fieldset>
+	</form>
+}
+
+function SettingsLocalStorageInput(props) {
+	const handleChange = this.createEventHandler();
+	const value = handleChange
+		.map(e => e.target.value)
+		.tap(value => localStorage.setItem(props.localStorageKey, value))
+		.startWith(localStorage.getItem(props.localStorageKey));
+
+	//value.subscribe(onChange);
+	value.tap(e => console.debug(e)).subscribe(props.onChange.onNext);
+	//function configuration(field, localStorageKey) {
+	//	let config = field.asEventStream('change')
+	//			.map('.target.value')
+	//			.toProperty(localStorage.getItem(localStorageKey));
+    //
+	//	config.onValue((key) => localStorage.setItem(localStorageKey, key));
+	//	config.onValue((key) => field.val(key));
+	//	return config;
+	//}
+
+	return <div>
+		<label for="redmine">Clé Redmine</label>
+		<input type="text" name="redmine" value={value} required="required" onChange={handleChange}/>
+	</div>
+}
+
+function ProjectSelector({redmineApiKey, onChange}) {
+	return <div id="selector">
+		<h2>Sélectionnez un projet</h2>
+
+		<label for="projet">Projet</label>
+		<select name="projet" id="projet" required="required">
+			<option value="">----</option>
+		</select>
+	</div>
+}
+
+function TasksList({project}) {
+	return <div id="results">
+		{ project ? "Coucou" : "Veuillez sélectionner un projet" }
+	</div>
+}
+
+Yolk.render(<App />, document.getElementById('app'));

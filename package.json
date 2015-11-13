@@ -10,9 +10,13 @@
   },
   "author": "",
   "license": "",
+  "babel": {
+    "jsxPragma": "Yolk.h"
+  },
   "dependencies": {
     "baconjs": "^0.7.60",
-    "jquery": "^2.1.4"
+    "jquery": "^2.1.4",
+    "yolk": "^0.9.0"
   },
   "devDependencies": {
     "babel-core": "^5.4.7",
