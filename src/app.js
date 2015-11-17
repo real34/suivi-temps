@@ -153,9 +153,20 @@ function toMilliseconds(timeInHours) {
 	return timeInHours * 60 * 60 * 1000;
 }
 
+// Yolk Utils
+function _emit(value, eventHandlerProp) {
+	// See https://github.com/garbles/yolk/issues/7
+	value.withLatestFrom(
+		eventHandlerProp,
+		(value, eventHandler) => eventHandler(value)
+	).subscribe();
+}
+
 function App() {
 	const settings = this.createEventHandler();
 	const project = this.createEventHandler();
+
+	settings.tap(e => console.debug('settings', e)).subscribe();
 
 	return <div>
 		<h1>Suivi du temps</h1>
@@ -168,46 +179,41 @@ function App() {
 }
 
 function Settings({onChange}) {
-	const redmineApi = {onNext: function(val) {
-		console.debug('redmine', val);
-	}};
+	const redmineApi = this.createEventHandler();
+	const togglApi = this.createEventHandler();
+	
+	const value = Yolk.Rx.Observable.combineLatest(
+		redmineApi, togglApi,
+		(redmineApi, togglApi) => ({redmineApi, togglApi})
+	);
+	_emit(value, onChange);
 
-	//let redmineApiKey = configuration($('[name=redmine]'), 'redmineApiKey');
-	//let togglApiKey = configuration($('[name=toggl]'), 'togglApiKey');
 	return 	<form id="api_keys">
 		<fieldset>
 			<legend>Vos clés API</legend>
-
-			<SettingsLocalStorageInput localStorageKey="redmineApiKey" onChange={redmineApi} />
-
-			<label for="toggl">Clé Toggl</label>
-			<input type="text" name="toggl" value="" required="required" />
+			<SettingsLocalStorageInput label="Clé Redmine" localStorageKey="redmineApiKey" onChange={redmineApi} helpUrl="http://projets.occitech.fr/my/account"/>
+			<SettingsLocalStorageInput label="Clé Toggl" localStorageKey="togglApiKey" onChange={togglApi} helpUrl="https://toggl.com/app/profile"/>
 		</fieldset>
 	</form>
 }
 
-function SettingsLocalStorageInput(props) {
+function SettingsLocalStorageInput({localStorageKey, label, helpUrl, onChange}) {
 	const handleChange = this.createEventHandler();
 	const value = handleChange
 		.map(e => e.target.value)
-		.tap(value => localStorage.setItem(props.localStorageKey, value))
-		.startWith(localStorage.getItem(props.localStorageKey));
+		.merge(localStorageKey.map(key => localStorage.getItem(key)));
 
-	//value.subscribe(onChange);
-	value.tap(e => console.debug(e)).subscribe(props.onChange.onNext);
-	//function configuration(field, localStorageKey) {
-	//	let config = field.asEventStream('change')
-	//			.map('.target.value')
-	//			.toProperty(localStorage.getItem(localStorageKey));
-    //
-	//	config.onValue((key) => localStorage.setItem(localStorageKey, key));
-	//	config.onValue((key) => field.val(key));
-	//	return config;
-	//}
+	value.withLatestFrom(
+		localStorageKey,
+		(value, key) => localStorage.setItem(key, value)
+	).subscribe();
+	_emit(value, onChange);
 
+	const fieldName = localStorageKey.map(name => `local-${name}`);
 	return <div>
-		<label for="redmine">Clé Redmine</label>
-		<input type="text" name="redmine" value={value} required="required" onChange={handleChange}/>
+		<label for={fieldName}>{label}</label>
+		<input type="text" id={fieldName} value={value} required="required" onChange={handleChange}/>
+		{helpUrl ? <a href={helpUrl} target="_blank">Par ici !</a> : ""}
 	</div>
 }
 
