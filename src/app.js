@@ -103,7 +103,7 @@ const issuesTimes = refreshTimesForVersion
 			.flatMap(issue => {
 				const params = {
 					description: `#${issue.id}`,
-					since: '2015-01-01'
+					since: '2016-01-01'
 				};
 				return Bacon.fromPromise(Toggl.reportsAPICall(data.togglApiKey, '/details', params))
 					.map((toggl) => ({ total_grand: toggl.total_grand, total_billable: toggl.total_billable, redmine: issue }))
