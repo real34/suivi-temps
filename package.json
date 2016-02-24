@@ -13,6 +13,7 @@
   "dependencies": {
     "@cycle/core": "^6.0.3",
     "@cycle/dom": "^9.1.0",
+    "@cycle/storage": "^2.0.3",
     "baconjs": "^0.7.60",
     "jquery": "^2.1.4",
     "rx": "^4.0.8"

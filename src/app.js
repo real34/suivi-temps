@@ -1,37 +1,64 @@
 import { Observable } from 'rx'
 import { run } from '@cycle/core'
 import { makeDOMDriver, h1, h2, div, form, fieldset, legend, label, input, select, option } from '@cycle/dom'
+import storageDriver from '@cycle/storage'
 
-const requiredFieldWithLabel = (fieldLabel, name) => ([
-	label({attributes: {'for': name}}, fieldLabel),
-	input('#' + name, {attributes: {type: 'text', name, required: 'required'}})
-])
+// TODO isolate()
+const locallyPersistedFieldWithLabel = ({storage, DOM}, fieldLabel, name) => {
+	const value$ = storage.local
+		.getItem(name)
+		.startWith('')
 
-const App = () => {
-	const DOM = Observable.just(div([
-		h1('Suivi du temps'),
-		form('#api_keys', [
-			fieldset([
-				legend('Vos clés API'),
-				requiredFieldWithLabel('Clé Redmine', 'redmine'),
-				requiredFieldWithLabel('Clé Toggl', 'toggl')
-			])
-		]),
-		div('#selector', [
-			h2('Sélectionnez un projet / une version à suivre'),
-			label({attributes: {'for': 'projet'}}, 'Projet'),
-			select('#projet', {attributes: {name: 'projet', required: 'required'}}, [
-				option({attributes: {value: ''}}, '----')
-			])
-		]),
-		div('#results', 'Veuillez sélectionner un projet')
-	]));
+	const vtree$ = value$.map(value => ([
+		label({attributes: {'for': name}}, fieldLabel),
+		input('#' + name, {attributes: {type: 'text', name, value, required: 'required'}})
+	]))
 
-	return {DOM}
+	const storageRequest$ = DOM.select('#' + name)
+		.events('keyup')
+		.map(e => ({
+			key: name,
+			value: e.target.value
+		}))
+
+	return {DOM: vtree$, storage: storageRequest$}
+}
+
+const App = (sources) => {
+    const redmineInput = locallyPersistedFieldWithLabel(sources, 'Clé Redmine', 'redmineApiKey');
+    const togglInput = locallyPersistedFieldWithLabel(sources, 'Clé Toggl', 'togglApiKey');
+
+	const DOM = Observable.combineLatest(
+		redmineInput.DOM, togglInput.DOM,
+		(redmineInput, togglInput) => div([
+			h1('Suivi du temps'),
+			form('#api_keys', [
+				fieldset([
+					legend('Vos clés API'),
+					redmineInput,
+					togglInput
+				])
+			]),
+			div('#selector', [
+				h2('Sélectionnez un projet / une version à suivre'),
+				label({attributes: {'for': 'projet'}}, 'Projet'),
+				select('#projet', {attributes: {name: 'projet', required: 'required'}}, [
+					option({attributes: {value: ''}}, '----')
+				])
+			]),
+			div('#results', 'Veuillez sélectionner un projet')
+		])
+	);
+
+	return {
+		DOM,
+		storage: Observable.merge(redmineInput.storage, togglInput.storage)
+	}
 }
 
 run(App, {
-	DOM: makeDOMDriver('#app')
+	DOM: makeDOMDriver('#app'),
+	storage: storageDriver
 })
 
 //import { configuration, notEmpty, updateSelect } from './helpers';
