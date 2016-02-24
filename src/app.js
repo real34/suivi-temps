@@ -3,6 +3,10 @@ import { run } from '@cycle/core'
 import { makeDOMDriver, h1, h2, div, form, fieldset, legend, label, input, select, option } from '@cycle/dom'
 import storageDriver from '@cycle/storage'
 
+import * as Redmine from './redmine';
+import * as Toggl from './toggl';
+
+// TODO Use http driver instead of big jquery ajax calls ;)
 // TODO isolate()
 const locallyPersistedFieldWithLabel = ({storage, DOM}, fieldLabel, name) => {
 	const value$ = storage.local
@@ -21,16 +25,48 @@ const locallyPersistedFieldWithLabel = ({storage, DOM}, fieldLabel, name) => {
 			value: e.target.value
 		}))
 
-	return {DOM: vtree$, storage: storageRequest$}
+	return {DOM: vtree$, storage: storageRequest$, value$}
+}
+
+const notEmpty = val => val !== "";
+
+const redmineProjectSelector = ({DOM}, redmineApiKey$) => {
+	const value$ = DOM.select('#projet').events('change')
+		.map(e => e.target.value)
+		.startWith(false)
+		.tap(v => console.debug('redmine proj', v))
+
+	const projects$ = redmineApiKey$
+		.flatMapLatest(apiKey => Observable.fromPromise(Redmine.APICall(apiKey, '/projects.json', { limit: 100 })))
+		.map(response => response.projects)
+
+	const vtree$ = projects$.map(projects => div('#selector', [
+		h2('Sélectionnez un projet / une version à suivre'),
+		label({attributes: {'for': 'projet'}}, 'Projet'),
+		select(
+			'#projet',
+			{attributes: {name: 'projet', required: 'required'}},
+			projects.map(project => option({attributes: {value: project.id}}, project.name))
+		)
+	]))
+
+	return {
+		DOM: vtree$,
+		value$
+	}
 }
 
 const App = (sources) => {
     const redmineInput = locallyPersistedFieldWithLabel(sources, 'Clé Redmine', 'redmineApiKey');
     const togglInput = locallyPersistedFieldWithLabel(sources, 'Clé Toggl', 'togglApiKey');
 
+	const redmineApiKey$ = redmineInput.value$.filter(notEmpty);
+
+	const projectSelector = redmineProjectSelector(sources, redmineApiKey$)
+
 	const DOM = Observable.combineLatest(
-		redmineInput.DOM, togglInput.DOM,
-		(redmineInput, togglInput) => div([
+		redmineInput.DOM, togglInput.DOM, projectSelector.DOM, projectSelector.value$,
+		(redmineInput, togglInput, projectsSelector, pid) => div([
 			h1('Suivi du temps'),
 			form('#api_keys', [
 				fieldset([
@@ -39,14 +75,8 @@ const App = (sources) => {
 					togglInput
 				])
 			]),
-			div('#selector', [
-				h2('Sélectionnez un projet / une version à suivre'),
-				label({attributes: {'for': 'projet'}}, 'Projet'),
-				select('#projet', {attributes: {name: 'projet', required: 'required'}}, [
-					option({attributes: {value: ''}}, '----')
-				])
-			]),
-			div('#results', 'Veuillez sélectionner un projet')
+			projectsSelector,
+			pid ? div('Vous avez sélectionné '+ pid) : div('#results', 'Veuillez sélectionner un projet')
 		])
 	);
 
@@ -71,16 +101,6 @@ run(App, {
 //
 //const projectSelector = $('#projet');
 //const issuesContainer = $('#results');
-//
-//let redmineApiKey = configuration($('[name=redmine]'), 'redmineApiKey');
-//let togglApiKey = configuration($('[name=toggl]'), 'togglApiKey');
-//
-//let projets = redmineApiKey
-//	.filter(notEmpty)
-//	.flatMapLatest((apiKey) => Bacon.fromPromise(Redmine.APICall(apiKey, '/projects.json', { limit: 100 })))
-//	.map('.projects');
-//
-//projets.onValue(updateSelect(projectSelector));
 //
 //let issues = projectSelector.asEventStream('change')
 //	.map((e) => $(e.target).val())
