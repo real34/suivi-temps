@@ -1,6 +1,6 @@
 import { Observable } from 'rx'
 import { run } from '@cycle/core'
-import { makeDOMDriver, h1, h2, div, form, fieldset, legend, label, input, select, option } from '@cycle/dom'
+import { makeDOMDriver, h1, h2, div, form, fieldset, legend, label, input, select, option, button, table, tr, td, th, thead, tbody, a } from '@cycle/dom'
 import storageDriver from '@cycle/storage'
 
 import * as Redmine from './redmine';
@@ -28,17 +28,19 @@ const locallyPersistedFieldWithLabel = ({storage, DOM}, fieldLabel, name) => {
 	return {DOM: vtree$, storage: storageRequest$, value$}
 }
 
-const notEmpty = val => val !== "";
+const notEmpty = val => val != ''
+
+const debug = message => v => console.debug(message, v)
 
 const redmineProjectSelector = ({DOM}, redmineApiKey$) => {
 	const value$ = DOM.select('#projet').events('change')
 		.map(e => e.target.value)
 		.startWith(false)
-		.tap(v => console.debug('redmine proj', v))
 
 	const projects$ = redmineApiKey$
 		.flatMapLatest(apiKey => Observable.fromPromise(Redmine.APICall(apiKey, '/projects.json', { limit: 100 })))
 		.map(response => response.projects)
+		.startWith([])
 
 	const vtree$ = projects$.map(projects => div('#selector', [
 		h2('Sélectionnez un projet / une version à suivre'),
@@ -56,17 +58,79 @@ const redmineProjectSelector = ({DOM}, redmineApiKey$) => {
 	}
 }
 
+const redmineIssuesList = (sources, projectId$, redmineApiKey$) => {
+	const issues$ = Observable.combineLatest(
+		projectId$.filter(notEmpty), redmineApiKey$.filter(notEmpty),
+		(projectId, apiKey) => {
+			return { projectId, apiKey }
+		})
+		.flatMapLatest(data => Observable.fromPromise(Redmine.APICall(data.apiKey, '/issues.json', {
+			limit: 100,
+			project_id: data.projectId,
+			status_id: '*'
+		})))
+		.map(response => response.issues);
+
+	const issuesByVersion$ = issues$.map(Redmine.groupIssuesByVersion);
+
+	const renderIssueItem = issue => {
+		const url = `${Redmine.URL}/issues/${issue.id}`;
+		const estimation = issue.estimated_hours || 0;
+
+		return tr([
+			td(a({href: url, attributes: {target: '_blank'}}, `#${issue.id}`)),
+			td(issue.subject),
+			td(estimation + 'h'),
+			td(issue.done_ratio + '%'),
+			td(issue.status.name),
+			td('.consommé', 'TBD'),
+			td('.facturable', 'TBD'),
+			td('.percent', 'TBD'),
+			td('.capital', 'TBD')
+		])
+	}
+	const fields = [
+		'#id',
+		'Description',
+		'Estimé',
+		'% réalisé',
+		'Etat',
+		'Temps consommé',
+		'Temps facturable',
+		'% temps',
+		'Capital',
+	]
+	const renderVersion = version => div('.version', [
+		h2(version.name),
+		button('.get-times', 'Zou'),
+		button('Pam'),
+		table([
+			thead(fields.map(header => th(header))),
+			tbody(version.issues.map(renderIssueItem))
+		])
+	])
+
+	const vtree$ = issuesByVersion$
+		.map(issuesByVersion => Object.keys(issuesByVersion).map(
+			key => renderVersion(issuesByVersion[key])
+		))
+		.startWith('')
+
+	return {DOM: vtree$}
+}
+
 const App = (sources) => {
     const redmineInput = locallyPersistedFieldWithLabel(sources, 'Clé Redmine', 'redmineApiKey');
     const togglInput = locallyPersistedFieldWithLabel(sources, 'Clé Toggl', 'togglApiKey');
 
-	const redmineApiKey$ = redmineInput.value$.filter(notEmpty);
+	const redmineApiKey$ = redmineInput.value$.filter(notEmpty)
 
 	const projectSelector = redmineProjectSelector(sources, redmineApiKey$)
+	const issuesList = redmineIssuesList(sources, projectSelector.value$, redmineApiKey$)
 
 	const DOM = Observable.combineLatest(
-		redmineInput.DOM, togglInput.DOM, projectSelector.DOM, projectSelector.value$,
-		(redmineInput, togglInput, projectsSelector, pid) => div([
+		redmineInput.DOM, togglInput.DOM, projectSelector.DOM, issuesList.DOM,
+		(redmineInput, togglInput, projectsSelector, issuesList) => div([
 			h1('Suivi du temps'),
 			form('#api_keys', [
 				fieldset([
@@ -76,7 +140,7 @@ const App = (sources) => {
 				])
 			]),
 			projectsSelector,
-			pid ? div('Vous avez sélectionné '+ pid) : div('#results', 'Veuillez sélectionner un projet')
+			issuesList
 		])
 	);
 
@@ -102,73 +166,6 @@ run(App, {
 //const projectSelector = $('#projet');
 //const issuesContainer = $('#results');
 //
-//let issues = projectSelector.asEventStream('change')
-//	.map((e) => $(e.target).val())
-//	.combine(redmineApiKey, function(projectId, apiKey) {
-//		return { projectId: projectId, apiKey: apiKey };
-//	})
-//	.flatMapLatest((data) => Bacon.fromPromise(Redmine.APICall(data.apiKey, '/issues.json', {
-//		limit: 100,
-//		project_id: data.projectId,
-//		status_id: '*'
-//	})))
-//	.map('.issues');
-//
-//let issuesByVersion = issues
-//	.map(Redmine.groupIssuesByVersion);
-//
-//function issueItem(issue) {
-//	const url = `${Redmine.URL}/issues/${issue.id}`;
-//	const estimation = issue.estimated_hours || 0;
-//
-//	return `<tr id="issue-${issue.id}">
-//		<td>
-//			<a href="${url}" target="_blank">#${issue.id}</a>
-//		</td>
-//		<td>${issue.subject}</td>
-//		<td>${estimation}h</td>
-//		<td>${issue.done_ratio}%</td>
-//		<td>${issue.status.name}</td>
-//		<td class="consommé">TBD</td>
-//		<td class="facturable">TBD</td>
-//		<td class="percent">TBD</td>
-//		<td class="capital">TBD</td>
-//	</tr>`;
-//}
-//
-//function updateIssues(issuesByVersion) {
-//	issuesContainer.html('');
-//
-//	for (let versionId in issuesByVersion) {
-//		let version = issuesByVersion[versionId];
-//		let html = `
-//			<div class="version" data-id="${versionId}">
-//				<h2>${version.name}</h2>
-//				<button class="get-times">Zou</button>
-//				<button onClick="alert('Coming soon')">Pam</button>
-//				<table>
-//					<thead>
-//						<th>#id</th>
-//						<th>Description</th>
-//						<th>Estimé</th>
-//						<th>% réalisé</th>
-//						<th>Etat</th>
-//						<th>Temps consommé</th>
-//						<th>Temps facturable</th>
-//						<th>% temps</th>
-//						<th>Capital</th>
-//					</thead>
-//					</tbody>
-//						${version.issues.map(issueItem).join("\n")}
-//					</tbody>
-//				</table>
-//			</div>
-//		`;
-//		issuesContainer.append(html);
-//	};
-//}
-//
-//issuesByVersion.onValue(updateIssues);
 //
 //const refreshTimesForVersion = $('body')
 //	.asEventStream('click', '.get-times')
