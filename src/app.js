@@ -103,7 +103,7 @@ const issuesTimes = refreshTimesForVersion
 			.flatMap(issue => {
 				const params = {
 					description: `#${issue.id}`,
-					since: '2016-01-01'
+					since: `${new Date().getFullYear()}-01-01`
 				};
 				return Bacon.fromPromise(Toggl.reportsAPICall(data.togglApiKey, '/details', params))
 					.map((toggl) => ({ total_grand: toggl.total_grand, total_billable: toggl.total_billable, redmine: issue }))
@@ -116,7 +116,7 @@ function updateIssuesTime(issue) {
 	const capital = parseInt(toMilliseconds(issue.redmine.estimated_hours || 0) - issue.total_billable);
 	let percentage = parseInt((issue.total_billable / toMilliseconds(issue.redmine.estimated_hours)) * 100);
 	percentage = isNaN(percentage) ? 100 : percentage;
-	
+
 	const isAlert = issue.redmine.done_ratio < percentage;
 	let styles = {
 		alert: {
