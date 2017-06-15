@@ -1,6 +1,6 @@
 import $ from 'jquery';
 
-const URL = 'http://projets.occitech.fr';
+const URL = 'https://projets.occitech.fr';
 
 function APICall(apiKey, resource, params) {
 	params = params || { };
